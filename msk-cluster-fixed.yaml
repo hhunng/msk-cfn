@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: '2010-09-09' 
+Parameters:
+  MSKKafkaVersion:
+    Description: "MSK version"
+    Type: String
+    Default: 3.5.1
+    AllowedValues:
+      - 3.5.1
+    MaxLength: 5  # Optional: limit length
+
+Resources:
+  LoggroupSetUp:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "${AWS::StackName}-MSKLog"  # Optional: specify a name
+      Tags:
+        - Key: "Name"
+          Value: "MSKLog"
+
+  MSKClusterConfig:
+    Type: AWS::MSK::Configuration
+    Properties:
+      Name: !Sub "${AWS::StackName}-msk-cluster-config"
+      ServerProperties: |
+        auto.create.topics.enable=false
+        default.replication.factor=3
+        min.insync.replicas=2
+        num.io.threads=8
+        num.network.threads=5
+        num.partitions=1
+        num.replica.fetchers=2
+        replica.lag.time.max.ms=30000
+        socket.receive.buffer.bytes=102400
+        socket.request.max.bytes=104857600
+        socket.send.buffer.bytes=102400
+        unclean.leader.election.enable=true
+        zookeeper.session.timeout.ms=18000
+  MSKCluster: 
+    Type: AWS::MSK::Cluster
+    Properties:
+      BrokerNodeGroupInfo:
+        ClientSubnets:
+          - subnet-0c61af8c20de13577
+          - subnet-041f67632bc10d250
+          - subnet-0d0b81558647fc776
+        InstanceType: kafka.m5.large
+        SecurityGroups:
+          - sg-0095bdd21b3df7076
+        StorageInfo:
+          EBSStorageInfo:
+            VolumeSize: 100       
+      ClientAuthentication: 
+        Sasl:
+          Iam:
+            Enabled: true
+      ClusterName: MSKCluster
+      ConfigurationInfo:
+        Arn: !Ref MSKClusterConfig
+        Revision: 1  # Consider managing this dynamically if needed
+      EnhancedMonitoring: DEFAULT
+      KafkaVersion: !Ref MSKKafkaVersion
+      LoggingInfo:
+        BrokerLogs:
+          CloudWatchLogs:
+            Enabled: true
+            LogGroup: !Ref LoggroupSetUp
+      NumberOfBrokerNodes: 3
+      Tags: 
+        Name: "MSKCluster"
+Outputs:
+  MSKClusterArn:
+    Description: MSK Cluster Arn
+    Value: !Ref MSKCluster
+    Export:
+      Name: !Sub "${AWS::StackName}-ClusterArn"  # Ensure uniqueness
